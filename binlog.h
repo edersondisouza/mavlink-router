@@ -18,6 +18,7 @@
 #pragma once
 
 #include "logendpoint.h"
+#include "ringbuffer.h"
 #include "timeout.h"
 
 #define BUFFER_LEN 2048
@@ -41,6 +42,8 @@ protected:
     const char *_get_logfile_extension() { return "bin"; };
 private:
     uint32_t _last_acked_seqno;
+
+    Ringbuffer<uint8_t[200]> _ringbuffer{128};
 
     bool _logging_seq(uint16_t seq, bool *drop);
     void _logging_data_process(mavlink_remote_log_data_block_t *msg);

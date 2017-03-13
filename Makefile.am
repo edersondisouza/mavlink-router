@@ -142,6 +142,8 @@ mavlink_routerd_SOURCES = \
 	mainloop.h \
 	pollable.h \
 	pollable.cpp \
+	ringbuffer.cpp \
+	ringbuffer.h\
 	timeout.h \
 	timeout.cpp \
 	ulog.h \

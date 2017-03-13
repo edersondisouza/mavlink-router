@@ -48,6 +48,7 @@ bool BinLog::start()
         return false;
     }
 
+    _ringbuffer.reset();
     _last_acked_seqno = 0;
     _system_id = SYSTEM_ID;
 
@@ -66,6 +67,7 @@ void BinLog::stop()
     mavlink_msg_remote_log_block_status_pack(_system_id, MAV_COMP_ID_ALL, &msg, _target_system_id, MAV_COMP_ID_ALL, MAV_REMOTE_LOG_DATA_BLOCK_STOP, 1);
     _send_msg(&msg, _target_system_id);
 
+    _ringbuffer.write_full(_file);
     LogEndpoint::stop();
 }
 
@@ -154,16 +156,22 @@ void BinLog::_send_ack(uint32_t seqno)
 
 void BinLog::_logging_data_process(mavlink_remote_log_data_block_t *msg)
 {
-    ssize_t r;
+    int result;
 
-    if (lseek(_file, msg->seqno * MAVLINK_MSG_REMOTE_LOG_DATA_BLOCK_FIELD_DATA_LEN, SEEK_SET) < 0) {
-        log_error_errno(errno, "lseek failed (%m)");
-        return;
-    }
-
-    r = write(_file, msg->data, MAVLINK_MSG_REMOTE_LOG_DATA_BLOCK_FIELD_DATA_LEN);
-    if (r != MAVLINK_MSG_REMOTE_LOG_DATA_BLOCK_FIELD_DATA_LEN) {
-        log_error_errno(errno, "Error writing data (%m)");
+    result = _ringbuffer.add(&msg->data, msg->seqno);
+    switch (result) {
+    case _ringbuffer.overflow:
+        // This is kinda desperate, because when ringbuffer filled, we tried to write
+        // TODO control these writes - maybe stop logging and starting again?
+        log_warning("Buffer overflow, discarding message, writing");
+        _ringbuffer.write_partial(_file);
+        break;
+    case _ringbuffer.full:
+        log_warning("Buffer full, writing");
+        _ringbuffer.write_partial(_file);
+        break;
+    case _ringbuffer.dropped:
+        log_warning("Received very old message. Dropping it");
         return;
     }
 
