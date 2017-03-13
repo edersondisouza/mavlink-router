@@ -17,6 +17,7 @@
  */
 #pragma once
 
+#include <assert.h>
 #include <mavlink.h>
 
 #include "comm.h"
